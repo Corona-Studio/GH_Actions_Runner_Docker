@@ -1,40 +1,30 @@
-# Use the Windows Server image with Windows Container Runtime
+# Use the specified Windows base image
 FROM mcr.microsoft.com/windows:10.0.17763.6659-amd64
 
-# ARGuments for GitHub Token and Organization Name
-ARG GITHUB_TOKEN
-ARG GITHUB_ORG
+# Define arguments for GitHub token and organization
+ARG GH_TOKEN
+ARG GH_ORG
+ARG GH_REPO
 
-# Set environment variable for GitHub Token
-ENV GH_TOKEN=${GITHUB_TOKEN}
+# Copy the PowerShell scripts to the /tmp directory
+COPY Deploy.ps1 /tmp/
+COPY Setup.ps1 /tmp/
 
-# Install GitHub CLI using winget
-RUN winget install --id GitHub.cli
+# Download Required Tools
+ADD https://github.com/cli/cli/releases/download/v2.64.0/gh_2.64.0_windows_amd64.msi /tmp/gh_windows_amd64.msi
+ADD https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/PowerShell-7.4.6-win-x64.msi /tmp/pwsh_windows_amd64.msi
 
-# Generate JIT configuration for self-hosted runner
-RUN powershell -Command "
-$jit_config = gh api \
-    --method POST \
-    -H 'Accept: application/vnd.github+json' \
-    -H 'X-GitHub-Api-Version: 2022-11-28' \
-    /orgs/${GITHUB_ORG}/actions/runners/generate-jitconfig \
-    -f 'name=CS_BUILD_RUNNER' -F 'runner_group_id=1' -f 'labels[0]=self-hosted'
+# Install Tools
+RUN powershell.exe -Command Start-Process -NoNewWindow -Wait -FilePath msiexec -ArgumentList '/i', 'C:\tmp\gh_windows_amd64.msi', '/quiet'
+RUN powershell.exe -Command Start-Process -NoNewWindow -Wait -FilePath msiexec -ArgumentList '/i', 'C:\tmp\pwsh_windows_amd64.msi', '/quiet'
 
-$decoded_config = [ConvertFrom-Json]($jit_config.encoded_jit_config | ConvertFrom-Base64)
-[System.IO.File]::WriteAllText('C:\\Runner\\config.json', $decoded_config)
-"
+# Set the working directory
+WORKDIR /tmp
 
-# Download the latest self-hosted runner for Windows
-RUN powershell -Command "
-$runner_info = gh api \
-    -H 'Accept: application/vnd.github+json' \
-    -H 'X-GitHub-Api-Version: 2022-11-28' \
-    /orgs/${GITHUB_ORG}/actions/runners/downloads
+# Create Token.txt, Org.txt and Repo.txt files with the contents of the ARGs
+RUN echo %GH_TOKEN% > Token.txt && \
+    echo %GH_ORG% > Org.txt && \
+    echo %GH_REPO% > Repo.txt
 
-$download_url = $runner_info | Where-Object { $_.os -eq 'win' -and $_.architecture -eq 'x64' } | Select-Object -ExpandProperty download_url
-Invoke-WebRequest -Uri $download_url -OutFile C:\\Runner\\runner.zip
-Expand-Archive -Path C:\\Runner\\runner.zip -DestinationPath C:\\Runner
-"
-
-# Run the self-hosted runner
-CMD [ "C:\\Runner\\svc.sh", "run" ]
+# Entry point
+ENTRYPOINT ["pwsh.exe", "-NoLogo", "-NonInteractive", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "./Deploy.ps1"]

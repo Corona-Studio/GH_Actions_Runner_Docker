@@ -11,7 +11,7 @@ A repo used to place all the auto deploy GitHub self-hosted runner Dockerfile sc
 ### Build
 
 ```ps
-docker build --build-arg GITHUB_TOKEN=your_token --build-arg GITHUB_ORG=your_org -t github-runner .
+docker build --build-arg GH_TOKEN=your_token --build-arg GH_ORG=your_org --build-arg GH_REPO=your_repo -t github-runner .
 ```
 
 ### Run

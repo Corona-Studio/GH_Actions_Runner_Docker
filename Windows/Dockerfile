@@ -1,5 +1,5 @@
 # Use the specified Windows base image
-FROM mcr.microsoft.com/windows:10.0.17763.6659-amd64
+FROM mcr.microsoft.com/windows:10.0.19042.985-amd64
 
 # Define arguments for GitHub token and organization
 ARG GH_TOKEN
